@@ -3,7 +3,6 @@ from flask import Flask, redirect, render_template_string, request
 app = Flask(__name__)
 
 # This dictionary acts as your transparent router. 
-# Your automated script will update this dynamically later.
 REDIRECTS = {
     "luxury-decor-01": "https://ambientlivinglab.com",
 }
@@ -13,7 +12,6 @@ REDIRECTS = {
 def catch_all(path):
     # 1. Clear tracking/routing logic
     if path in REDIRECTS:
-        # In the future, your script will log 'path' and request.remote_addr to SQLite here
         return redirect(REDIRECTS[path], code=302)
     
     # 2. Innocent, clean homepage for Pinterest to verify and "Claim"
@@ -35,3 +33,6 @@ def catch_all(path):
     </body>
     </html>
     """)
+
+# CRUCIAL FOR VERCEL NATIVE ROUTING:
+handler = app

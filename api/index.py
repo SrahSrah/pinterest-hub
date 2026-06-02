@@ -66,24 +66,30 @@ def catch_all(path):
         return render_template_string(_PRIVACY_HTML)
 
     # Transparent tracked redirect: /go/<slug>
+    # Fully guarded: a missing key, malformed value, or KV outage must never
+    # 500 — it falls through to the landing page instead.
     if path.startswith("go/"):
         slug = path[len("go/"):]
-        raw = _kv("get", f"redirect:{slug}")
-        if raw:
-            data = json.loads(raw)
-            dest = data["url"]
-            if data.get("sub_id"):
-                dest = _append_query(dest, "subid", data["sub_id"])
-            # Log the click (best-effort).
-            _kv("incr", f"clicks:{slug}")
-            _kv("lpush", "clicks:log", body=json.dumps({
-                "slug": slug,
-                "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "ref": request.referrer,
-                "ua": request.headers.get("User-Agent"),
-            }))
-            return redirect(dest, code=302)
-        # Unknown/expired slug — fall through to the landing page.
+        try:
+            raw = _kv("get", f"redirect:{slug}")
+            if raw:
+                data = json.loads(raw)
+                dest = data.get("url") if isinstance(data, dict) else None
+                if dest:
+                    if data.get("sub_id"):
+                        dest = _append_query(dest, "subid", data["sub_id"])
+                    # Log the click (best-effort).
+                    _kv("incr", f"clicks:{slug}")
+                    _kv("lpush", "clicks:log", body=json.dumps({
+                        "slug": slug,
+                        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                        "ref": request.referrer,
+                        "ua": request.headers.get("User-Agent"),
+                    }))
+                    return redirect(dest, code=302)
+        except Exception:
+            pass  # malformed data / KV error -> fall through to landing
+        # Unknown/expired/unresolvable slug — fall through to the landing page.
 
     return render_template_string(_HOME_HTML)
 
